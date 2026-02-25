@@ -12,6 +12,7 @@ import software.amazon.awssdk.services.s3.model.PutObjectRequest;
 import java.nio.charset.StandardCharsets;
 import java.time.LocalDate;
 import java.time.YearMonth;
+import java.time.Instant;
 import java.util.HashMap;
 import java.util.Map;
 
@@ -26,12 +27,22 @@ public class CsvReportHandler implements RequestHandler<Object, Map<String, Obje
     @Override
     public Map<String, Object> handleRequest(Object input, Context context) {
 
+        context.getLogger().log("Lambda execution started\n");
+        context.getLogger().log("Execution time (UTC): " + Instant.now() + "\n");
+        context.getLogger().log("Input payload: " + input + "\n");
+        context.getLogger().log("DynamoDB table: " + tableName + "\n");
+        context.getLogger().log("S3 bucket: " + bucketName + "\n");
+
         YearMonth currentMonth = YearMonth.now();
         Map<String, TrainerSummary> summaryMap = new HashMap<>();
+
+        context.getLogger().log("Scanning DynamoDB table...\n");
 
         ScanResponse response = dynamoDb.scan(
                 ScanRequest.builder().tableName(tableName).build()
         );
+
+        context.getLogger().log("Items found: " + response.items().size() + "\n");
 
         for (Map<String, AttributeValue> item : response.items()) {
 
@@ -72,6 +83,8 @@ public class CsvReportHandler implements RequestHandler<Object, Map<String, Obje
                 currentMonth.getMonthValue()
         );
 
+        context.getLogger().log("Uploading report to S3: " + fileName + "\n");
+
         s3.putObject(
                 PutObjectRequest.builder()
                         .bucket(bucketName)
@@ -82,6 +95,9 @@ public class CsvReportHandler implements RequestHandler<Object, Map<String, Obje
                         csv.toString().getBytes(StandardCharsets.UTF_8)
                 )
         );
+
+        context.getLogger().log("Upload completed successfully\n");
+        context.getLogger().log("Lambda execution finished\n");
 
         return Map.of(
                 "statusCode", 200,
